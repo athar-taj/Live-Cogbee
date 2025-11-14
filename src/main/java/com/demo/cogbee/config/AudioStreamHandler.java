@@ -1,56 +1,43 @@
 package com.demo.cogbee.config;
 
-import com.demo.cogbee.service.SpeechToTextService;
-import com.demo.cogbee.service.live.AsrService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.BinaryWebSocketHandler;
 
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class AudioStreamHandler extends BinaryWebSocketHandler {
 
-	private final SpeechToTextService speechService;
-	private final SimpMessagingTemplate messagingTemplate;
 
-	@Autowired
-	public AudioStreamHandler(SpeechToTextService speechService, SimpMessagingTemplate messagingTemplate) {
-		this.speechService = speechService;
-		this.messagingTemplate = messagingTemplate;
-	}
+    private final ConcurrentHashMap<String, List<byte[]>> audioBuffers = new ConcurrentHashMap<>();
 
-	@Override
-	public void afterConnectionEstablished(WebSocketSession session) {
-		System.out.println("🔗 Audio stream connected: " + session.getId());
-	}
+    @Override
+    public void afterConnectionEstablished(WebSocketSession session) {
+        // Extract sessionId
+        String query = session.getUri().getQuery();   // "sessionId=..."
+        String sessionId = query.split("=")[1];
 
-	@Override
-	protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) throws IOException {
-		byte[] bytes = message.getPayload().array();
-		String sessionId = (String) session.getAttributes().getOrDefault("sessionId", "default");
+        session.getAttributes().put("sessionId", sessionId);
+        audioBuffers.put(sessionId, new ArrayList<>());
 
-		try {
-			// 🧠 Convert chunk → text
-			String textChunk = speechService.transcribeChunk(bytes);
+        System.out.println("🔗 Audio stream connected: " + sessionId);
+    }
 
-			// 📨 Send partial text to frontend
-			messagingTemplate.convertAndSend("/topic/live/" + sessionId, textChunk);
+    @Override
+    protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
+        int size = message.getPayloadLength();
+        if (size == 1) return; // ignore heartbeat
 
-			System.out.println("🗣️ Chunk processed: " + textChunk);
+        byte[] chunk = message.getPayload().array();
 
-		} catch (Exception e) {
-			messagingTemplate.convertAndSend("/topic/live/" + sessionId, "Error: " + e.getMessage());
-		}
-	}
+        String sessionId = (String) session.getAttributes().get("sessionId");
+        audioBuffers.get(sessionId).add(chunk);
 
-	@Override
-	public void handleTransportError(WebSocketSession session, Throwable exception) {
-		System.err.println("❌ WebSocket error: " + exception.getMessage());
-	}
+        System.out.println("🎤 Chunk received (" + sessionId + "): " + size + " bytes");
+    }
 }
-
-

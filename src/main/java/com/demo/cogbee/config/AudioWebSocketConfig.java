@@ -17,6 +17,7 @@ public class AudioWebSocketConfig implements WebSocketConfigurer {
 
 	@Override
 	public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-		registry.addHandler(audioStreamHandler, "/ws/audio").setAllowedOrigins("*");
+        registry.addHandler(audioStreamHandler, "/audio-stream")
+                .setAllowedOrigins("http://localhost:5500", "http://127.0.0.1:5500");
 	}
 }

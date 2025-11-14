@@ -3,13 +3,13 @@ package com.demo.cogbee.controller;
 import com.demo.cogbee.model.EvaluationResult;
 import com.demo.cogbee.model.response.InterviewFeedbackResponse;
 import com.demo.cogbee.service.InterviewService;
+import com.demo.cogbee.service.SpeechToTextService;
 import com.demo.cogbee.service.live.AsrService;
 import com.demo.cogbee.service.live.EvaluationService;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,20 +31,25 @@ public class InterviewController {
 	@Autowired
 	private EvaluationService evaluationService; // evaluate transcript
 
-	@Autowired
-	private SimpMessagingTemplate messagingTemplate;
+    @Autowired
+    private SpeechToTextService speechToTextService;
 
 	@PostMapping(value = "/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<InterviewFeedbackResponse> analyzeCandidate(
 			@RequestParam("question") String question,
 			@RequestParam("photo") MultipartFile candidatePhoto,
-			@RequestParam("video") MultipartFile answerVideo) {
+			@RequestParam("video") MultipartFile answerVideo) throws IOException {
 
 		InterviewFeedbackResponse response =
 				interviewService.analyzeCandidate(question, candidatePhoto, answerVideo);
 
 		return ResponseEntity.ok(response);
 	}
+
+    @GetMapping("/test")
+    public String test() {
+        return "testing";
+    }
 
 	@PostMapping("/upload")
 	public ResponseEntity<?> uploadAnswer(@RequestParam("sessionId") String sessionId,
@@ -59,10 +64,21 @@ public class InterviewController {
 		EvaluationResult result = evaluationService.evaluateTranscript(transcript);
 
 		String topic = "/topic/feedback/" + sessionId;
-		messagingTemplate.convertAndSend(topic, new FeedbackPayload(result.getCorrectness(), result.getFeedback()));
+//		messagingTemplate.convertAndSend(topic, new FeedbackPayload(result.getCorrectness(), result.getFeedback()));
 
 		return ResponseEntity.ok().build();
 	}
+
+
+    @PostMapping(value = "/transcribe-chunk", consumes = "application/octet-stream")
+    public ResponseEntity<String> transcribe(@RequestBody byte[] chunk) {
+
+        String text = speechToTextService.transcribeChunk(chunk);
+
+        System.out.println("TRANSCRIBED TEXT: " + text);
+
+        return ResponseEntity.ok(text);
+    }
 
 	public static class FeedbackPayload {
 		private double score;

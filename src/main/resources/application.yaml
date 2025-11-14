@@ -3,7 +3,7 @@ spring:
     name: cogbee
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/cogbee_db
+    url: jdbc:postgresql://localhost:5432/postgres
     username: postgres
     password: root
     driver-class-name: org.postgresql.Driver
@@ -19,3 +19,13 @@ spring:
     multipart:
       max-file-size: 200MB
       max-request-size: 200MB
+
+  websocket:
+    session:
+      timeout: 0
+
+server:
+  servlet:
+    session:
+      timeout: 30m
+
