@@ -10,49 +10,84 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
 
     private final Map<String, Set<WebSocketSession>> rooms = new HashMap<>();
     private final Map<String, String> sessionRoom = new HashMap<>();
+    private final ObjectMapper mapper = new ObjectMapper();
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) {
+    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         System.out.println("Connected: " + session.getId());
+
+
+        var msg = Map.of(
+                "type", "id",
+                "id", session.getId()
+        );
+        session.sendMessage(new TextMessage(mapper.writeValueAsString(msg)));
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        var json = new ObjectMapper().readTree(message.getPayload());
+        var json = mapper.readTree(message.getPayload());
         String type = json.get("type").asText();
 
-        if ("join".equals(type)) {
+        // --------------------------
+        // JOIN ROOM
+        // --------------------------
+        if (type.equals("join")) {
             String roomId = json.get("roomId").asText();
+
             rooms.putIfAbsent(roomId, new HashSet<>());
             rooms.get(roomId).add(session);
             sessionRoom.put(session.getId(), roomId);
 
-            // send list of existing participants to the new user
-            var existing = new ArrayList<String>();
-            for (WebSocketSession s : rooms.get(roomId)) {
-                if (!s.getId().equals(session.getId())) {
-                    existing.add(s.getId());
-                }
-            }
+            // send existing peers to the new user
+            List<String> existingPeers = rooms.get(roomId).stream()
+                    .filter(s -> !s.getId().equals(session.getId()))
+                    .map(WebSocketSession::getId)
+                    .toList();
 
-            session.sendMessage(new TextMessage("{\"type\":\"peers\",\"peers\":" + existing + "}"));
+            var reply = Map.of(
+                    "type", "peers",
+                    "peers", existingPeers
+            );
+
+            session.sendMessage(new TextMessage(mapper.writeValueAsString(reply)));
             return;
         }
 
-        // relay SDP/ICE to all peers in same room
+        // --------------------------
+        // RELAY (OFFER / ANSWER / ICE)
+        // --------------------------
         String roomId = sessionRoom.get(session.getId());
+        if (roomId == null) return;
+
         for (WebSocketSession s : rooms.get(roomId)) {
             if (!s.getId().equals(session.getId())) {
-                s.sendMessage(message);
+
+                // Add "from" to the message
+                var relay = mapper.readValue(message.getPayload(), Map.class);
+                relay.put("from", session.getId());
+
+                s.sendMessage(new TextMessage(mapper.writeValueAsString(relay)));
             }
         }
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        String room = sessionRoom.get(session.getId());
-        if (room != null) {
-            rooms.get(room).remove(session);
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+        String roomId = sessionRoom.get(session.getId());
+        if (roomId != null) {
+            rooms.get(roomId).remove(session);
+            sessionRoom.remove(session.getId());
+
+            // broadcast leave event
+            Map<String, Object> msg = Map.of(
+                    "type", "leave",
+                    "from", session.getId()
+            );
+
+            for (WebSocketSession s : rooms.get(roomId)) {
+                s.sendMessage(new TextMessage(mapper.writeValueAsString(msg)));
+            }
         }
     }
 }

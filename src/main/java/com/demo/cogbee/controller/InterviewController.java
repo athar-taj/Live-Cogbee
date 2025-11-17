@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,17 +36,17 @@ public class InterviewController {
     @Autowired
     private SpeechToTextService speechToTextService;
 
-	@PostMapping(value = "/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<InterviewFeedbackResponse> analyzeCandidate(
-			@RequestParam("question") String question,
-			@RequestParam("photo") MultipartFile candidatePhoto,
-			@RequestParam("video") MultipartFile answerVideo) throws IOException {
-
-		InterviewFeedbackResponse response =
-				interviewService.analyzeCandidate(question, candidatePhoto, answerVideo);
-
-		return ResponseEntity.ok(response);
-	}
+//	@PostMapping(value = "/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+//	public ResponseEntity<InterviewFeedbackResponse> analyzeCandidate(
+//			@RequestParam("question") String question,
+//			@RequestParam("photo") MultipartFile candidatePhoto,
+//			@RequestParam("video") MultipartFile answerVideo) throws IOException {
+//
+//		InterviewFeedbackResponse response =
+//				interviewService.analyzeCandidate(question, candidatePhoto, answerVideo);
+//
+//		return ResponseEntity.ok(response);
+//	}
 
     @GetMapping("/test")
     public String test() {
@@ -70,17 +72,17 @@ public class InterviewController {
 	}
 
 
-    @PostMapping(value = "/transcribe-chunk", consumes = "application/octet-stream")
-    public ResponseEntity<String> transcribe(@RequestBody byte[] chunk) {
+    @PostMapping(value = "/answer-video", consumes = "multipart/form-data")
+    public ResponseEntity<InterviewFeedbackResponse> transcriptVideo(@RequestParam("file") MultipartFile file) throws IOException {
 
-        String text = speechToTextService.transcribeChunk(chunk);
+        System.out.println("🎥 Received video: " + file.getOriginalFilename() +
+                " (" + file.getSize() + " bytes)");
 
-        System.out.println("TRANSCRIBED TEXT: " + text);
+        return ResponseEntity.ok().body(interviewService.analyzeCandidate("What is inharitance in java?",file));
 
-        return ResponseEntity.ok(text);
     }
 
-	public static class FeedbackPayload {
+    public static class FeedbackPayload {
 		private double score;
 		private String feedback;
 		public FeedbackPayload(double score, String feedback) { this.score = score; this.feedback = feedback; }

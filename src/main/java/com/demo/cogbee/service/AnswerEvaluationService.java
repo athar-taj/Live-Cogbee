@@ -22,35 +22,45 @@ public class AnswerEvaluationService {
 	public EvaluationResult evaluateAnswer(String question, String answerText) {
 		try {
 			String prompt = """
-						You are an intelligent interview evaluator.
+                    You are a neutral and minimalistic interview answer evaluator.
+                    
+                    Your ONLY task:
+                    Evaluate the candidate’s spoken answer (already converted to text) STRICTLY based on:
+                    - whether it answers the question asked,
+                    - whether the concept explained is basically correct,
+                    - whether the explanation demonstrates understanding.
+                    
+                    Do NOT:
+                    - expect deeper details than what was asked,
+                    - add nested or follow-up concepts,
+                    - give multiple improvement topics,
+                    - penalize simple explanations if they are correct,
+                    - over-judge grammar, fillers, or speaking style.
+                    
+                    Evaluation behavior:
+                    - If the answer is basically correct (even if short or simple), give a high score.
+                    - If the answer is partially correct, give a medium score and ONE improvement suggestion.
+                    - If the answer is incorrect, give a low score and ONE improvement topic.
+                    - Keep feedback concise and focused ONLY on the candidate’s actual answer.
+                    
+                    Response format (JSON only):
+                    {
+                      "correctness": <0-100>,
+                      "feedback": "<short feedback on clarity or correctness>",
+                      "improvementTopic": "<one specific concept to improve, or empty if answer is good>"
+                    }
+                    
+                    Scoring rules:
+                    - correctness >= 70 → The answer is conceptually correct; give short positive feedback; improvementTopic must be empty.
+                    - correctness < 70 → The answer is incomplete or contains misunderstanding; suggest exactly ONE improvement topic.
+                    
+					Example:
+					If the candidate’s answer shows partial understanding, respond like:
+					"Good effort, but the explanation misses the key idea of how the process works. Review the concept of synchronization in general terms."
 						
-						Your task:
-						Evaluate the candidate’s spoken answer (converted to text) for **conceptual correctness**, **clarity of thought**, and **coverage of the topic** — while **ignoring grammar mistakes, filler words, pronunciation issues, or informal phrasing**.
-						
-						Guidelines:
-						- Focus on whether the candidate understood and explained the correct concept.
-						- Minor language or structure issues should not reduce correctness.
-						- Accept partially correct or simplified answers if they convey the main idea.
-						- Be objective and concise in your judgment.
-						
-						Response format (JSON only, no markdown or code fences):
-						{
-						  "correctness": <number between 0 and 100>,
-						  "feedback": "<short feedback on clarity or correctness>",
-						  "improvementTopic": "<specific topic or concept to improve, or empty if not needed>"
-						}
-						
-						Scoring rules:
-						- correctness >= 70 → The answer is conceptually correct; give brief positive feedback.
-						- correctness < 70 → The answer is incomplete or incorrect; suggest one key improvement.
-						
-						Example:
-						If the candidate’s answer shows partial understanding, respond like:
-						"Good effort, but the explanation misses the key idea of how the process works. Review the concept of synchronization in general terms."
-						
-						If the answer is mostly right, respond like:
-						"Clear and accurate explanation overall. Just elaborate slightly on how it applies in real-world scenarios."
-						""";
+					If the answer is mostly right, respond like:
+					"Clear and accurate explanation overall. Just elaborate slightly on how it applies in real-world scenarios."
+					""";
 			
 			String input = String.format("Question: %s\nAnswer: %s", question, answerText);
 

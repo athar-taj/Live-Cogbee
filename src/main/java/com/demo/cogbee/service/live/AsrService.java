@@ -19,8 +19,4 @@ public class AsrService {
 		// For now, return a placeholder:
 		return "This is a placeholder transcript from the ASR service. Replace with real ASR.";
 	}
-
-	public String transcribeChunk(byte[] audioBytes) {
-		return speechToTextService.transcribeChunk(audioBytes);
-	}
 }
