@@ -13,9 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -28,13 +26,16 @@ public class InterviewController {
 	private final InterviewService interviewService;
 
 	@Autowired
-	private AsrService asrService; // transcribe audio file
+	private AsrService asrService;
 
 	@Autowired
-	private EvaluationService evaluationService; // evaluate transcript
+	private EvaluationService evaluationService;
 
     @Autowired
     private SpeechToTextService speechToTextService;
+
+    private static final String SESSION_DIR = "/tmp/stt-sessions/";
+
 
 //	@PostMapping(value = "/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 //	public ResponseEntity<InterviewFeedbackResponse> analyzeCandidate(
@@ -72,14 +73,43 @@ public class InterviewController {
 	}
 
 
-    @PostMapping(value = "/answer-video", consumes = "multipart/form-data")
-    public ResponseEntity<InterviewFeedbackResponse> transcriptVideo(@RequestParam("file") MultipartFile file) throws IOException {
+    @PostMapping(value = "/answer-chunk", consumes = "application/octet-stream")
+    public ResponseEntity<String> receiveChunk(
+            @RequestParam String sessionId,
+            InputStream body
+    ) throws IOException {
 
-        System.out.println("🎥 Received video: " + file.getOriginalFilename() +
-                " (" + file.getSize() + " bytes)");
+        File dir = new File(SESSION_DIR + sessionId);
+        dir.mkdirs();
 
-        return ResponseEntity.ok().body(interviewService.analyzeCandidate("What is inharitance in java?",file));
+        File wavFile = new File(dir, "recording.wav");
 
+        try (OutputStream out = new FileOutputStream(wavFile, true)) {
+            body.transferTo(out); // APPEND
+        }
+
+        System.out.println("⬆ WAV chunk stored for: " + sessionId);
+        return ResponseEntity.ok("Chunk OK");
+    }
+
+    @PostMapping("/answer-finish")
+    public ResponseEntity<InterviewFeedbackResponse> finish(
+            @RequestParam String sessionId
+    ) throws Exception {
+
+        File wavFile = new File(SESSION_DIR + sessionId + "/recording.wav");
+
+        if (!wavFile.exists()) {
+            return ResponseEntity.badRequest()
+                    .body(new InterviewFeedbackResponse(false, 0, 0, "No WAV found", "", ""));
+        }
+
+        System.out.println("📁 Finalizing WAV session: " + sessionId);
+
+        InterviewFeedbackResponse response =
+                interviewService.analyzeCandidate(wavFile);
+
+        return ResponseEntity.ok(response);
     }
 
     public static class FeedbackPayload {

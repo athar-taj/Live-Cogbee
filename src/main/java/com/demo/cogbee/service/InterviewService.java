@@ -5,6 +5,7 @@ import com.demo.cogbee.model.response.InterviewFeedbackResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
 import java.io.IOException;
 
 @Service
@@ -47,8 +48,7 @@ public class InterviewService {
 //	}
 
     public InterviewFeedbackResponse analyzeCandidate(
-            String question,
-            MultipartFile video
+          File video
     ) throws IOException {
 
         // 1️⃣ Optional: Verify candidate identity
@@ -60,7 +60,7 @@ public class InterviewService {
         String transcript = speechToTextService.extractText(video);
 
         // 3️⃣ Evaluate correctness using AI
-        EvaluationResult evaluation = answerEvaluationService.evaluateAnswer(question, transcript);
+        EvaluationResult evaluation = answerEvaluationService.evaluateAnswer("what is Inheritance in java?", transcript);
 
         // 4️⃣ Build final response
         return new InterviewFeedbackResponse(

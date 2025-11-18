@@ -17,39 +17,67 @@ public class SpeechToTextService {
     private static final String LANG = "en";
     private static final int RESULT_TYPE = 4;
 
-    public String extractText(MultipartFile video) {
+    public String extractText(File inputFile) {
 
-        File webmFile = null;
-        File mp4File = null;
+        File wavFile = null;
 
         try {
-            // 1️⃣ Save incoming WEBM to temp file
-            webmFile = File.createTempFile("upload_", ".webm");
-            video.transferTo(webmFile);
+            wavFile = File.createTempFile("converted_", ".wav");
 
-            // 2️⃣ Convert WEBM → MP4 (SpeechFlow friendly)
-            mp4File = File.createTempFile("converted_", ".mp4");
-            convertToMp4(webmFile, mp4File);
+            convertToWav(inputFile, wavFile);
 
-            // 3️⃣ Save MP4 permanently for debugging
-            saveDebugCopy(mp4File);
+            if (wavFile.length() < 2000) {
+                throw new RuntimeException("WAV file too small = invalid audio");
+            }
 
-            // 4️⃣ Create SpeechFlow task with MP4 file
-            String taskId = createTranscription(mp4File);
-
-            if (taskId == null)
+            String taskId = createTranscription(wavFile);
+            if (taskId == null) {
                 throw new RuntimeException("Failed to create transcription task");
+            }
 
-            // 5️⃣ Fetch transcription
             return queryResult(taskId);
 
         } catch (Exception e) {
-            throw new RuntimeException("SpeechFlow transcription failed: " + e.getMessage(), e);
+            throw new RuntimeException("STT failed: " + e.getMessage(), e);
+
         } finally {
-            if (webmFile != null) webmFile.delete();
-            if (mp4File != null) mp4File.delete();
+            if (wavFile != null && wavFile.exists()) {
+                // wavFile.delete();
+            }
         }
     }
+
+
+
+    public void convertToWav(File input, File output) throws Exception {
+
+        ProcessBuilder pb = new ProcessBuilder(
+                "ffmpeg",
+                "-y",
+                "-i", input.getAbsolutePath(),
+                "-vn",
+                "-ac", "1",
+                "-ar", "16000",
+                "-acodec", "pcm_s16le",
+
+                output.getAbsolutePath()
+        );
+
+        pb.redirectErrorStream(true);
+        Process p = pb.start();
+
+        BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line;
+        while ((line = br.readLine()) != null) {
+            System.out.println("FFmpeg: " + line);
+        }
+
+        int exit = p.waitFor();
+        if (exit != 0) {
+            throw new RuntimeException("FFmpeg failed, exit code = " + exit);
+        }
+    }
+
 
     // -------------------------
     // Convert WebM → MP4
