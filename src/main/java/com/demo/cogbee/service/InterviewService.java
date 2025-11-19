@@ -23,29 +23,29 @@ public class InterviewService {
 		this.answerEvaluationService = answerEvaluationService;
 	}
 
-//	public InterviewFeedbackResponse analyzeCandidate(String question,
-//													  MultipartFile photo,
-//													  MultipartFile video) throws IOException {
-//		// 1️⃣ Verify same candidate throughout
-////		double faceMatchScore = faceVerificationService.verifyThroughoutVideo(photo, video);
-////		boolean isSamePerson = faceMatchScore > 0.8;
-//
-//		// 2️⃣ Convert speech to text
-////		String transcript = speechToTextService.transcribeChunk(video.getBytes());
-//
-//		// 3️⃣ Evaluate correctness using AI model
-//		EvaluationResult evaluation = answerEvaluationService.evaluateAnswer(question, null);
-//
-//		// 4️⃣ Combine everything
-//		return new InterviewFeedbackResponse(
-//				true,
-//				80,
-//				evaluation.getCorrectness(),
-//				evaluation.getFeedback(),
-//				evaluation.getImprovement(),
-//				null
-//		);
-//	}
+	public InterviewFeedbackResponse analyzeCandidate(String question,
+													  MultipartFile photo,
+													  MultipartFile video) throws IOException {
+		// 1️⃣ Verify same candidate throughout
+//		double faceMatchScore = faceVerificationService.verifyThroughoutVideo(photo, video);
+//		boolean isSamePerson = faceMatchScore > 0.8;
+
+		// 2️⃣ Convert speech to text
+//		String transcript = speechToTextService.transcribeChunk(video.getBytes());
+
+		// 3️⃣ Evaluate correctness using AI model
+		EvaluationResult evaluation = answerEvaluationService.evaluateAnswer(question, null);
+
+		// 4️⃣ Combine everything
+		return new InterviewFeedbackResponse(
+				true,
+				80,
+				evaluation.getCorrectness(),
+				evaluation.getFeedback(),
+				evaluation.getImprovement(),
+				null
+		);
+	}
 
     public InterviewFeedbackResponse analyzeCandidate(
           File video
