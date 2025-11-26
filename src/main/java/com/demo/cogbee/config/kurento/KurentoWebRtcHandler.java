@@ -17,18 +17,12 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
-    // sessionId -> WebSocketSession
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
-    // roomId -> KurentoRoom
     private final Map<String, KurentoRoom> rooms = new ConcurrentHashMap<>();
-    // sessionId -> roomId
     private final Map<String, String> userRooms = new ConcurrentHashMap<>();
-    // sessionId -> queued ICE candidates before endpoint is ready
     private final Map<String, List<IceCandidate>> candidateQueue = new ConcurrentHashMap<>();
 
-    // ---- create a NEW KurentoClient each time (no Spring bean) ----
     private KurentoClient createClient() {
-        // change URL if your KMS is not on localhost
         return KurentoClient.create("ws://localhost:8888/kurento");
     }
 
@@ -69,7 +63,6 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
         System.out.println("Kurento WS client disconnected: " + sessionId);
     }
 
-    // ------------------ JOIN ROOM ------------------
     private void handleJoin(WebSocketSession session, Map<String, Object> data) throws Exception {
         String sessionId = session.getId();
         String roomId = (String) data.get("roomId");
@@ -78,7 +71,6 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
             return;
         }
 
-        // Create room IF ABSENT with its own KurentoClient + MediaPipeline
         KurentoRoom room = rooms.computeIfAbsent(roomId, id -> {
             KurentoClient kc = createClient();
             MediaPipeline pipeline = kc.createMediaPipeline();
@@ -88,7 +80,6 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
 
         userRooms.put(sessionId, roomId);
 
-        // tell client joined ok
         session.sendMessage(new TextMessage(
                 mapper.writeValueAsString(Map.of(
                         "type", "joined",
@@ -99,7 +90,6 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
         System.out.println("User " + sessionId + " joined Kurento room " + roomId);
     }
 
-    // ------------------ HANDLE OFFER ------------------
     private void handleOffer(WebSocketSession session, Map<String, Object> data) throws Exception {
         String sessionId = session.getId();
         String roomId = userRooms.get(sessionId);
@@ -123,7 +113,6 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
         WebRtcEndpoint endpoint = room.getEndpoint(sessionId);
         boolean isNew = false;
 
-        // ---------------- CREATE ENDPOINT ----------------
         if (endpoint == null) {
             endpoint = new WebRtcEndpoint.Builder(room.getPipeline()).build();
             room.addParticipant(sessionId, endpoint);
@@ -131,7 +120,6 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
 
             System.out.println("Created new WebRtcEndpoint for: " + sessionId);
 
-            // ---------------- LISTEN TO ICE FROM KURENTO ----------------
             WebRtcEndpoint finalEndpoint = endpoint;
             endpoint.addIceCandidateFoundListener(event -> {
                 try {
@@ -144,7 +132,6 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
                             )
                     );
 
-                    // Send back to THIS session
                     session.sendMessage(new TextMessage(mapper.writeValueAsString(candidateMsg)));
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -156,7 +143,6 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
             });
         }
 
-        // ---------------- WIRE WITH OTHER USERS IN ROOM ----------------
         if (isNew) {
             for (Map.Entry<String, WebRtcEndpoint> entry : room.getParticipants().entrySet()) {
                 String otherId = entry.getKey();
@@ -171,15 +157,12 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
             }
         }
 
-        // ---------------- PROCESS OFFER ----------------
         String sdpAnswer = endpoint.processOffer(sdpOffer);
 
-        // -- SEND ANSWER BACK TO CLIENT --
         session.sendMessage(new TextMessage(mapper.writeValueAsString(
                 Map.of("type", "answer", "answer", sdpAnswer)
         )));
 
-        // ---------------- FLUSH QUEUED ICE ----------------
         List<IceCandidate> queued = candidateQueue.get(sessionId);
         if (queued != null) {
             System.out.println("Flushing " + queued.size() + " queued ICE candidates for " + sessionId);
@@ -187,11 +170,9 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
             candidateQueue.remove(sessionId);
         }
 
-        // Start ICE gathering
         endpoint.gatherCandidates();
     }
 
-    // ------------------ HANDLE ICE CANDIDATE ------------------
     @SuppressWarnings("unchecked")
     private void handleCandidate(WebSocketSession session, Map<String, Object> data) {
         String sessionId = session.getId();
@@ -225,7 +206,6 @@ public class KurentoWebRtcHandler extends TextWebSocketHandler {
         endpoint.addIceCandidate(candidate);
     }
 
-    // ------------------ LEAVE ------------------
     private void handleLeave(String sessionId) {
         String roomId = userRooms.remove(sessionId);
         if (roomId == null) return;

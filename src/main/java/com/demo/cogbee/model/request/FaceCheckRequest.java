@@ -2,7 +2,7 @@ package com.demo.cogbee.model.request;
 
 public class FaceCheckRequest {
     private String sessionId;
-    private String frame;  // Base64 Image (data:image/jpeg;base64,...)
+    private String frame;
 
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }

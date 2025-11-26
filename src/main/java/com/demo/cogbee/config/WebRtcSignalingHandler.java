@@ -13,39 +13,27 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
-    // Connection id -> WebSocketSession
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
 
-    /**
-     * roomId -> RoomState
-     */
+
     private final Map<String, RoomState> rooms = new ConcurrentHashMap<>();
 
-    /**
-     * userId -> roomId
-     * Helps us quickly find which room to broadcast to.
-     */
     private final Map<String, String> userRooms = new ConcurrentHashMap<>();
 
-    /**
-     * Room metadata: users + who is host/interviewer + meeting flags
-     */
+
     private static class RoomState {
         final Set<String> users = ConcurrentHashMap.newKeySet();
-        String hostId;               // first user becomes host by default
+        String hostId;
         boolean interviewStarted = false;
     }
 
-    // ----------------------------------------------------------------
-    //  CONNECTION LIFECYCLE
-    // ----------------------------------------------------------------
+
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         String id = UUID.randomUUID().toString();
         sessions.put(id, session);
         session.getAttributes().put("userId", id);
 
-        // Send the client its own id
         session.sendMessage(new TextMessage(
                 "{\"type\":\"id\",\"id\":\"" + id + "\"}"
         ));
@@ -80,31 +68,26 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
         if (userId != null) {
             sessions.remove(userId);
 
-            // Find the room this user was in
             String roomId = userRooms.remove(userId);
             if (roomId != null) {
                 RoomState room = rooms.get(roomId);
                 if (room != null) {
                     room.users.remove(userId);
 
-                    // If host leaves, pick a new host if possible
                     if (userId.equals(room.hostId) && !room.users.isEmpty()) {
                         String newHost = room.users.iterator().next();
                         room.hostId = newHost;
 
-                        // Notify room that host changed
                         broadcastToRoom(roomId, Map.of(
                                 "type", "host_changed",
                                 "hostId", newHost
                         ));
                     }
 
-                    // If room is now empty, clean it up
                     if (room.users.isEmpty()) {
                         rooms.remove(roomId);
                     }
 
-                    // Inform peers in *that room only*
                     broadcastLeaveToRoom(roomId, userId);
                 }
             }
@@ -113,9 +96,7 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
         System.out.println("Client disconnected: " + userId);
     }
 
-    // ----------------------------------------------------------------
-    //  ROOM JOIN / LEAVE
-    // ----------------------------------------------------------------
+
     private void handleJoin(String userId, Map<String, Object> data, WebSocketSession session) throws Exception {
         String roomId = (String) data.get("roomId");
         if (roomId == null || roomId.isBlank()) {
@@ -126,7 +107,6 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
         rooms.putIfAbsent(roomId, new RoomState());
         RoomState room = rooms.get(roomId);
 
-        // First user becomes host by default
         if (room.hostId == null) {
             room.hostId = userId;
         }
@@ -134,7 +114,6 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
         room.users.add(userId);
         userRooms.put(userId, roomId);
 
-        // 1️⃣ Send list of existing peers to the new user
         List<String> peers = room.users.stream()
                 .filter(uid -> !uid.equals(userId))
                 .toList();
@@ -142,20 +121,19 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
         Map<String, Object> payload = new HashMap<>();
         payload.put("type", "peers");
         payload.put("peers", peers);
-        payload.put("hostId", room.hostId); // so frontend can know who is host
+        payload.put("hostId", room.hostId);
         payload.put("role", userId.equals(room.hostId) ? "host" : "participant");
 
         session.sendMessage(new TextMessage(
                 mapper.writeValueAsString(payload)
         ));
 
-        // 2️⃣ Notify all existing peers that a new one joined
         Map<String, Object> newPeerMsg = Map.of(
                 "type", "new_peer",
                 "peerId", userId
         );
 
-        broadcastToRoom(roomId, newPeerMsg, Set.of(userId)); // exclude the new user
+        broadcastToRoom(roomId, newPeerMsg, Set.of(userId));
 
         System.out.println("User " + userId + " joined room " + roomId);
     }
@@ -168,9 +146,8 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
         broadcastToRoom(roomId, msg);
     }
 
-    // ----------------------------------------------------------------
+
     //  WEBRTC FORWARDING
-    // ----------------------------------------------------------------
     private void forwardToTarget(Map<String, Object> data, String senderId) throws Exception {
         data.put("from", senderId);
 
@@ -184,9 +161,7 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
 
 
 
-    // ----------------------------------------------------------------
     //  MEETING EVENTS (START/STOP, QUESTION, MUTE, ETC.)
-    // ----------------------------------------------------------------
     private void handleMeetingEvent(String userId, Map<String, Object> data) throws Exception {
         String roomId = userRooms.get(userId);
         if (roomId == null) return;
@@ -194,7 +169,6 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
         RoomState room = rooms.get(roomId);
         if (room == null) return;
 
-        // Only host can trigger interview-level events
         if (!userId.equals(room.hostId)) {
             System.out.println("Non-host tried to send meeting_event: " + userId);
             return;
@@ -207,7 +181,6 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
         msg.put("type", "meeting_event");
         msg.put("event", event);
 
-        // Optional fields (question text, etc.)
         if (data.containsKey("question")) {
             msg.put("question", data.get("question"));
         }
@@ -215,7 +188,6 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
             msg.put("targetUserId", data.get("targetUserId"));
         }
 
-        // Maintain interviewStarted flag for this room
         if ("start".equals(event)) {
             room.interviewStarted = true;
         } else if ("end".equals(event)) {
@@ -225,9 +197,7 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
         broadcastToRoom(roomId, msg);
     }
 
-    // ----------------------------------------------------------------
     //  SUBTITLE / STT EVENTS
-    // ----------------------------------------------------------------
     private void handleSubtitle(String userId, Map<String, Object> data) throws Exception {
         String roomId = userRooms.get(userId);
         if (roomId == null) return;
@@ -244,9 +214,7 @@ public class WebRtcSignalingHandler extends TextWebSocketHandler {
         broadcastToRoom(roomId, msg);
     }
 
-    // ----------------------------------------------------------------
     //  BROADCAST HELPERS
-    // ----------------------------------------------------------------
     private void broadcastToRoom(String roomId, Map<String, Object> payload) {
         broadcastToRoom(roomId, payload, Collections.emptySet());
     }

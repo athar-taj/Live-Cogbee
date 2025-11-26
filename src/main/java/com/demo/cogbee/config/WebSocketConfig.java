@@ -1,6 +1,5 @@
 package com.demo.cogbee.config;
 
-import com.demo.cogbee.config.WebRtcSignalingHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.*;
@@ -15,9 +14,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer, WebSoc
         this.signalingHandler = signalingHandler;
     }
 
-    // -----------------------------
-    // STOMP ENDPOINT (optional)
-    // -----------------------------
+
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
@@ -31,9 +28,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer, WebSoc
         config.setApplicationDestinationPrefixes("/app");
     }
 
-    // -----------------------------
-    // RAW WEBRTC SIGNALING WEBSOCKET
-    // -----------------------------
+
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(signalingHandler, "/signal")

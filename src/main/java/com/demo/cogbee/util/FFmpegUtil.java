@@ -19,7 +19,6 @@ public class FFmpegUtil {
 			Process process = pb.start();
 			process.waitFor();
 
-			// Collect extracted frames
 			List<File> frames = new ArrayList<>();
 			File parent = videoFile.getParentFile();
 			for (File f : parent.listFiles((dir, name) -> name.startsWith("frame_"))) {

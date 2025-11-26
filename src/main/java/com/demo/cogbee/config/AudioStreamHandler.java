@@ -18,8 +18,7 @@ public class AudioStreamHandler extends BinaryWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        // Extract sessionId
-        String query = session.getUri().getQuery();   // "sessionId=..."
+        String query = session.getUri().getQuery();
         String sessionId = query.split("=")[1];
 
         session.getAttributes().put("sessionId", sessionId);
@@ -31,7 +30,7 @@ public class AudioStreamHandler extends BinaryWebSocketHandler {
     @Override
     protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
         int size = message.getPayloadLength();
-        if (size == 1) return; // ignore heartbeat
+        if (size == 1) return;
 
         byte[] chunk = message.getPayload().array();
 

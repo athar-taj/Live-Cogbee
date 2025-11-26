@@ -86,7 +86,6 @@ public class AnswerEvaluationService {
 					.path("content").path("parts").get(0)
 					.path("text").asText();
 
-			// ✅ Extract the JSON part (even if wrapped in ```json ... ```)
 			String jsonString = extractJson(text);
 
 			JsonNode aiJson = mapper.readTree(jsonString);
@@ -103,25 +102,19 @@ public class AnswerEvaluationService {
 		}
 	}
 
-	/**
-	 * Extracts the JSON block from a text that may contain markdown code fences like ```json ... ```
-	 */
 	private String extractJson(String text) {
-		// Match text inside triple backticks or curly braces
 		Pattern pattern = Pattern.compile("(?s)```(?:json)?(.*?)```");
 		Matcher matcher = pattern.matcher(text);
 		if (matcher.find()) {
 			return matcher.group(1).trim();
 		}
 
-		// Fallback: try to find first '{' and last '}'
 		int start = text.indexOf("{");
 		int end = text.lastIndexOf("}");
 		if (start != -1 && end != -1 && end > start) {
 			return text.substring(start, end + 1);
 		}
 
-		// If no JSON detected, return as plain string
 		return "{\"correctness\": 0, \"feedback\": \"" + text.replace("\"", "'") + "\", \"improvementTopic\": \"General\"}";
 	}
 }

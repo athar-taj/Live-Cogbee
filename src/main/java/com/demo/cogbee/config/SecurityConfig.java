@@ -20,7 +20,7 @@ public class SecurityConfig {
                 )
                 .formLogin(login -> login.disable())
                 .headers(headers -> headers.disable())
-                .httpBasic(basic -> basic.disable());  // 🔥 disable auth popup
+                .httpBasic(basic -> basic.disable());
 
         return http.build();
     }

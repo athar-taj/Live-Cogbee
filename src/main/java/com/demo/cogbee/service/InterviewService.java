@@ -62,7 +62,6 @@ public class InterviewService {
         // 3️⃣ Evaluate correctness using AI
         EvaluationResult evaluation = answerEvaluationService.evaluateAnswer("what is Inheritance in java?", transcript);
 
-        // 4️⃣ Build final response
         return new InterviewFeedbackResponse(
                 isSamePerson,
                 80,

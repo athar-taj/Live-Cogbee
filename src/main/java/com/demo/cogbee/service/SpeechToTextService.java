@@ -79,9 +79,7 @@ public class SpeechToTextService {
     }
 
 
-    // -------------------------
     // Convert WebM → MP4
-    // -------------------------
     private void convertToMp4(File input, File output) throws Exception {
 
         // H.264 + AAC → BEST compatibility with SpeechFlow
@@ -110,9 +108,7 @@ public class SpeechToTextService {
             throw new RuntimeException("FFmpeg MP4 conversion failed, exitCode=" + exitCode);
     }
 
-    // -------------------------
     // Save MP4 for debugging
-    // -------------------------
     private void saveDebugCopy(File mp4File) throws IOException {
         File debugDir = new File("debug_videos");
         if (!debugDir.exists()) debugDir.mkdir();
@@ -132,9 +128,7 @@ public class SpeechToTextService {
         System.out.println("📁 Saved debug MP4: " + savedFile.getAbsolutePath());
     }
 
-    // -------------------------
     // SpeechFlow create task
-    // -------------------------
     private String createTranscription(File file) throws Exception {
         String createUrl = "https://api.speechflow.io/asr/file/v1/create";
         HttpURLConnection connection = (HttpURLConnection) new URL(createUrl).openConnection();
@@ -149,12 +143,10 @@ public class SpeechToTextService {
 
         try (DataOutputStream out = new DataOutputStream(connection.getOutputStream())) {
 
-            // lang field
             out.writeBytes("--" + boundary + "\r\n");
             out.writeBytes("Content-Disposition: form-data; name=\"lang\"\r\n\r\n");
             out.writeBytes(LANG + "\r\n");
 
-            // file field
             out.writeBytes("--" + boundary + "\r\n");
             out.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"audio.mp4\"\r\n");
             out.writeBytes("Content-Type: video/mp4\r\n\r\n");
@@ -179,9 +171,7 @@ public class SpeechToTextService {
         throw new RuntimeException("Create failed: " + json.get("msg").asText());
     }
 
-    // -------------------------
     // SpeechFlow poll task
-    // -------------------------
     private String queryResult(String taskId) throws Exception {
         String queryUrl =
                 "https://api.speechflow.io/asr/file/v1/query?taskId=" + taskId + "&resultType=" + RESULT_TYPE;
